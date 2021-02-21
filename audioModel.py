@@ -30,19 +30,35 @@ for segment in data['label'].keys():
     label = np.nan_to_num(label).flatten()
     audio = np.nan_to_num(audio).flatten()
 
-    data_array.append((audio, label))
+    data_array.append((audio, label, segment))
 
 # %%
 
-import pandas as pd
+def multi_collate(batch):
+    '''
+    Collate functions assume batch = [Dataset[i] for i in index_set]
+    '''
+    # for later use we sort the batch in descending order of length
+    batch = sorted(batch, key=lambda x: x[0][0].shape[0], reverse=True)
+    
+    # get the data out of the batch - use pad sequence util functions from PyTorch to pad things
+    labels = torch.cat([torch.from_numpy(sample[1]) for sample in batch], dim=0)
+    sentences = pad_sequence([torch.LongTensor(sample[0][0]) for sample in batch], padding_value=PAD)
+    visual = pad_sequence([torch.FloatTensor(sample[0][1]) for sample in batch])
+    acoustic = pad_sequence([torch.FloatTensor(sample[0][2]) for sample in batch])
+    
+    # lengths are useful later in using RNNs
+    lengths = torch.LongTensor([sample[0][0].shape[0] for sample in batch])
+    return sentences, visual, acoustic, labels, lengths
 
-data_df = pd.DataFrame(data_array, columns=['audio', 'label'])
-
-target = data_df.pop('label')
 
 # %%
-import tensorflow as tf
-data_tf = tf.data.Dataset.from_tensor_slices((data_df.values, target.values))
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.33, random_state=42)
+
+# %%
+
 
 
 
